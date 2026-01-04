@@ -2,11 +2,6 @@
 """
 Chat pipeline with memory and compression for the RAG project.
 
-Requirements (already in the project):
- - llm_client.py  (must expose call_llm_local(prompt) and provide vs = VectorStore() global)
- - memory_manager.py (ConversationMemory)
- - vectorstore.py (VectorStore), used by llm_client
- - Optional: prompts.py if you want to use its PROMPT_TEMPLATE, but here we build our own prompt.
 
 This module:
  - retrieves document contexts from the global VectorStore
@@ -277,7 +272,7 @@ class ChatWithMemory:
 # ---------- Helpers for integration with Gradio / chat UI ----------
 def ask_fn_for_ui(history: List[Dict[str,str]], user_input: str, top_k: int = DEFAULT_TOP_K):
     """
-    Helper compatible with your chat_ui / gradio:
+    
     - history is the list of messages [{'role':'user'/'assistant','content':...}, ...]
     - returns: (modified_history, empty_input_string)
     """
@@ -307,7 +302,7 @@ def ask_fn_for_ui(history: List[Dict[str,str]], user_input: str, top_k: int = DE
     history.append({"role":"assistant", "content": answer})
     return history, ""
 
-# If run from the console for quick debugging
+# If run for quick debugging
 if __name__ == "__main__":
     print("Quick ChatWithMemory demo (exit with Ctrl+C).")
     chat = ChatWithMemory()
@@ -320,3 +315,4 @@ if __name__ == "__main__":
         print("Assistant:", resp)
         ui_hist.append({"role":"user","content":q})
         ui_hist.append({"role":"assistant","content":resp})
+
