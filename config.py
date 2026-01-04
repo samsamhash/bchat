@@ -1,15 +1,16 @@
 # config.py
 """
-Configuración y utilidades para detectar artefactos de fine-tuning (modelos completos o adapters PEFT)
-y ayudar a cargar el modelo correctamente en entornos como Google Colab.
+Configuration and utilities to detect fine-tuning artifacts (full models or PEFT adapters)
+and help load the model correctly in environments such as Google Colab.
 
-Exporta (entre otros):
- - LLM_MODEL: ruta o id que debes pasar a AutoTokenizer/AutoModelForCausalLM.from_pretrained
- - LLM_ADAPTER_PATH: si no es None, directorio del adapter PEFT (aplicar con apply_adapter_to_model)
- - LLM_IS_ADAPTER: True si LLM_ADAPTER_PATH está presente / se detectó adapter-only
+Exports (among others):
+ - LLM_MODEL: path or ID to pass to AutoTokenizer / AutoModelForCausalLM.from_pretrained
+ - LLM_ADAPTER_PATH: if not None, PEFT adapter directory (apply with apply_adapter_to_model)
+ - LLM_IS_ADAPTER: True if LLM_ADAPTER_PATH is present / an adapter-only setup was detected
  - LLM_TEMPERATURE, LLM_MAX_TOKENS, SEARCH_TOP_K
- - apply_adapter_to_model(model, adapter_path): función robusta para aplicar adapter PEFT
- - load_tokenizer_and_model_from_config(...): helper para cargar tokenizer/model y aplicar adapter
+ - apply_adapter_to_model(model, adapter_path): robust function to apply a PEFT adapter
+ - load_tokenizer_and_model_from_config(...): helper to load the tokenizer/model and apply the adapter
+
 """
 
 from __future__ import annotations
@@ -24,25 +25,26 @@ if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
 # -------------------------
-# Defaults (sobrescribibles por environment)
+# Defaults 
 # -------------------------
-# Base model id o ruta local (se usa cuando se detecta un adapter-only)
+# Base model id or route local
+
 LLM_BASE_MODEL: str = os.getenv("BASE_MODEL") or os.getenv("LLM_MODEL") or "Qwen/Qwen2.5-1.5B-Instruct"
 
-# Donde buscar salidas de finetune (comma-sep)
+
 _FINETUNE_SEARCH_ROOTS = os.getenv("FINETUNE_SEARCH_ROOTS", "models,./models").split(",")
 
-# Parámetros de inferencia por defecto
+# Inference
 LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", os.getenv("LLM_TEMP", "0.2")))
 LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "256"))
 SEARCH_TOP_K: int = int(os.getenv("SEARCH_TOP_K", "5"))
 
-# Variables que serán determinadas por la lógica de detección
+
 LLM_MODEL: str = LLM_BASE_MODEL
 LLM_ADAPTER_PATH: Optional[str] = None
 LLM_IS_ADAPTER: bool = False
 
-# Marcas de archivo para detectar modelo completo vs adapter
+
 _FULL_MODEL_MARKERS = {
     "pytorch_model.bin", "pytorch_model.safetensors", "model.safetensors", "tf_model.h5", "model.bin"
 }
@@ -51,14 +53,14 @@ _ADAPTER_MARKERS = {
     "pytorch_lora.bin"
 }
 
-# Archivos de tokenizer que pueden acompañar a un adapter (para detectar vocab_size)
+
 _TOKENIZER_FILES = {
     "tokenizer.json", "tokenizer_config.json", "vocab.json", "vocab.txt", "merges.txt", "tokenizer.model",
     "special_tokens_map.json"
 }
 
 # -------------------------
-# Utilidades de detección
+# Utilities
 # -------------------------
 def _dir_contains_any_files(p: Path, names: set) -> bool:
     try:
@@ -82,8 +84,8 @@ def _dir_has_tokenizer(p: Path) -> bool:
 
 def _iter_candidate_dirs(roots: List[str]) -> List[Tuple[Path, float, str]]:
     """
-    Recorre roots (no recursivo profundo: mira subdirectorios inmediatos) y devuelve
-    tuplas (path, mtime, kind) donde kind es "full" o "adapter".
+    Iterates over roots (not deep recursive: only checks immediate subdirectories) and returns
+    tuples (path, mtime, kind) where kind is "full" or "adapter".
     """
     candidates: List[Tuple[Path, float, str]] = []
     for root in roots:
@@ -107,7 +109,7 @@ def _iter_candidate_dirs(roots: List[str]) -> List[Tuple[Path, float, str]]:
                         continue
                 except Exception:
                     continue
-            # also consider the root itself (in case models/ contains files directly)
+           
             try:
                 if _dir_is_full_model(root_p):
                     candidates.append((root_p, root_p.stat().st_mtime, "full"))
@@ -119,9 +121,8 @@ def _iter_candidate_dirs(roots: List[str]) -> List[Tuple[Path, float, str]]:
 
 
 def _select_latest_candidate(cands: List[Tuple[Path, float, str]]) -> Optional[Tuple[Path, str]]:
-    """
-    Selecciona el candidato más reciente. Si hay empate, prefiere 'full' sobre 'adapter'.
-    """
+   
+   
     if not cands:
         return None
     cands_sorted = sorted(cands, key=lambda x: (x[1], 0 if x[2] == "full" else 1), reverse=True)
@@ -129,17 +130,17 @@ def _select_latest_candidate(cands: List[Tuple[Path, float, str]]) -> Optional[T
     return (chosen[0], chosen[2])
 
 # -------------------------
-# Detección principal
+# Detection
 # -------------------------
 def _detect_finetuned_artifact():
     """
-    Detecta el artefacto de finetune más reciente bajo _FINETUNE_SEARCH_ROOTS.
-    Prioriza:
-      1) override por env: LLM_MODEL_FORCE  (usa como modelo completo)
-      2) override por env: LLM_ADAPTER_PATH (si apunta a adapter o full, actúa en consecuencia)
-      3) búsqueda automática: el último directorio con modelo completo o adapter.
-    Ajusta las variables globales LLM_MODEL, LLM_ADAPTER_PATH, LLM_IS_ADAPTER.
-    """
+    Detects the most recent fine-tuning artifact under _FINETUNE_SEARCH_ROOTS.
+Priority order:
+ Environment override: LLM_MODEL_FORCE (use as a full model)
+ Environment override: LLM_ADAPTER_PATH (if it points to an adapter or a full model, act accordingly)
+ Automatic search: the latest directory containing a full model or an adapter.
+ Updates the global variables LLM_MODEL, LLM_ADAPTER_PATH, and LLM_IS_ADAPTER
+     """
     global LLM_MODEL, LLM_ADAPTER_PATH, LLM_IS_ADAPTER
 
     env_force = os.getenv("LLM_MODEL_FORCE")
@@ -215,7 +216,7 @@ except Exception as e:
     LLM_IS_ADAPTER = False
 
 # -------------------------
-# Helpers para aplicar adapter + resize embeddings
+# Helpers 
 # -------------------------
 def _resize_model_embeddings_if_needed(model, target_rows: int):
     """
@@ -247,15 +248,15 @@ def _resize_model_embeddings_if_needed(model, target_rows: int):
 
 def _inspect_checkpoint_for_embedding_rows(checkpoint_file: Path) -> Optional[int]:
     """
-    Intenta leer la forma de embeddings desde checkpoints (.safetensors o .bin).
-    Retorna int o None.
+   Attempts to read the embedding shape from checkpoints (.safetensors or .bin).
+   Returns an int or None.
     """
     try:
         import torch
         suffix = checkpoint_file.suffix.lower()
         if suffix == ".safetensors":
             try:
-                # Intentamos usar safetensors para solo leer shapes (si está instalado)
+                
                 from safetensors import safe_open as _safe_open  # type: ignore
                 with _safe_open(str(checkpoint_file), framework="pt") as f:
                     for k in f.keys():
@@ -264,7 +265,7 @@ def _inspect_checkpoint_for_embedding_rows(checkpoint_file: Path) -> Optional[in
                             if len(shape) == 2:
                                 return shape[0]
             except Exception:
-                # fallback a cargar con safetensors.torch si está disponible
+               
                 try:
                     from safetensors.torch import load_file as _load_safetensors  # type: ignore
                     sd = _load_safetensors(str(checkpoint_file))
@@ -276,7 +277,7 @@ def _inspect_checkpoint_for_embedding_rows(checkpoint_file: Path) -> Optional[in
                     logger.debug("Could not inspect safetensors checkpoint shapes (safetensors not available).")
                     return None
         else:
-            # .bin u otros: cargamos parcialmente en CPU (cuidado con memoria)
+           
             try:
                 sd = torch.load(str(checkpoint_file), map_location="cpu")
             except Exception:
@@ -299,24 +300,24 @@ def _inspect_checkpoint_for_embedding_rows(checkpoint_file: Path) -> Optional[in
 
 def apply_adapter_to_model(model, adapter_path: str):
     """
-    Aplica un adapter PEFT a un modelo base, intentando:
-     - cargar tokenizer del adapter (si existe) y redimensionar embeddings
-     - o inspeccionar checkpoint para determinar vocab size y redimensionar
-     - finalmente llamar a PeftModel.from_pretrained para envolver el modelo
-    Retorna el modelo envuelto (PeftModel) o lanza excepción con mensaje claro.
+    Applies a PEFT adapter to a base model, attempting to:
+    load the adapter’s tokenizer (if present) and resize embeddings
+    or inspect the checkpoint to determine the vocab size and resize embeddings
+    finally call PeftModel.from_pretrained to wrap the model
+    Returns the wrapped model (PeftModel) or raises an exception with a clear error message.
     """
     try:
         from peft import PeftModel
     except Exception as exc:
         raise ImportError("PEFT no está instalado. Instala 'peft' para aplicar adapters.") from exc
 
-    import torch  # import local para evitar forzar dependencia al importar config
+    import torch  
 
     adapter_dir = Path(adapter_path).expanduser().resolve()
     if not adapter_dir.exists():
         raise FileNotFoundError(f"Adapter path not found: {adapter_dir}")
 
-    # 1) Si el adapter incluye tokenizer, cargarlo y redimensionar embeddings
+    
     try:
         if _dir_has_tokenizer(adapter_dir):
             from transformers import AutoTokenizer
@@ -332,7 +333,7 @@ def apply_adapter_to_model(model, adapter_path: str):
     except Exception as e:
         logger.warning("Failed to load adapter tokenizer or determine vocab size: %s", e)
 
-    # 2) Si no hubo tokenizer o no pudimos determinar tamaño, inspeccionar checkpoints en adapter_dir
+    
     try:
         
         candidates = ["adapter_model.safetensors", "adapter_model.bin", "pytorch_lora_weights.bin",
@@ -352,10 +353,10 @@ def apply_adapter_to_model(model, adapter_path: str):
     except Exception as e:
         logger.debug("No checkpoint inspected or error inspecting: %s", e)
 
-    # 3) Finalmente envolvemos con PeftModel
+    
     try:
         device_map = "auto" if (os.getenv("CUDA_VISIBLE_DEVICES") or (lambda: True)()) else None
-        # prefer device_map 'auto' when CUDA available; PEFT maneja el mapeo
+        # prefer device_map 'auto' when CUDA available; 
         wrapped = PeftModel.from_pretrained(model, str(adapter_dir), device_map="auto" if _cuda_available() else None)
         logger.info("PEFT adapter aplicado desde %s", adapter_dir)
         print("peft adapt")
@@ -363,11 +364,7 @@ def apply_adapter_to_model(model, adapter_path: str):
     except Exception as e:
         msg = (
             f"Failed to load PEFT adapter from {adapter_dir}: {e}\n\n"
-            "Esto suele significar mismatch entre tokenizer/embeddings del modelo base y el adapter.\n"
-            "Sugerencias:\n"
-            " - Asegúrate de que el adapter contiene el tokenizer utilizado en finetuning y vuelve a intentar.\n"
-            " - Carga exactamente el mismo base model usado en el finetune.\n"
-            " - Si tienes el tokenizer del entrenamiento, cárgalo primero y redimensiona embeddings."
+            
         )
         logger.exception(msg)
         raise RuntimeError(msg) from e
@@ -381,7 +378,7 @@ def _cuda_available() -> bool:
         return False
 
 # -------------------------
-# Helper robusto para Colab: carga tokenizer+modelo y aplica adapter si corresponde
+# Helper 
 # -------------------------
 def load_tokenizer_and_model_from_config(
     llm_model: Optional[str] = None,
@@ -391,9 +388,9 @@ def load_tokenizer_and_model_from_config(
     prefer_fp16_on_cuda: bool = True,
 ):
     """
-    Carga tokenizer y modelo basados en la detección en este módulo.
-    Parámetros opcionales permiten anular llm_model y adapter_path.
-    Retorna (tokenizer, model, device_str).
+   Loads the tokenizer and model based on the detection performed in this module.
+   Optional parameters allow overriding llm_model and adapter_path.
+   Returns (tokenizer, model, device_str).
     """
     import torch
     from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -404,10 +401,10 @@ def load_tokenizer_and_model_from_config(
 
     logger.info("Loading tokenizer/model. base_model=%s adapter=%s device=%s", llm_model, adapter_path, device)
 
-    # Cargar tokenizer
+    
     tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=trust_remote_code, use_fast=True)
 
-    # Decide dtype y device_map
+    
     load_kwargs: Dict[str, Any] = {"trust_remote_code": trust_remote_code}
     if device == "cuda":
         torch_dtype = torch.float16 if prefer_fp16_on_cuda else torch.float32
@@ -415,7 +412,7 @@ def load_tokenizer_and_model_from_config(
     else:
         load_kwargs.update({"device_map": None})
 
-    # Cargar modelo base (podría ser ruta local o HF id)
+    
     try:
         model = AutoModelForCausalLM.from_pretrained(llm_model, **load_kwargs)
     except Exception as e:
@@ -424,7 +421,7 @@ def load_tokenizer_and_model_from_config(
         safe_kwargs["device_map"] = "auto" if device == "cuda" else None
         model = AutoModelForCausalLM.from_pretrained(llm_model, **safe_kwargs)
 
-    # Si hay adapter, intentar aplicar (función maneja resize si es necesario)
+    
     if adapter_path:
         try:
             model = apply_adapter_to_model(model, adapter_path)
@@ -432,20 +429,20 @@ def load_tokenizer_and_model_from_config(
             logger.exception("apply_adapter_to_model falló: %s", e)
             raise
 
-    # Asegurar modelo en dispositivo
+    
     try:
         if device == "cuda":
             model.to(torch.device("cuda"))
         else:
             model.to(torch.device("cpu"))
     except Exception:
-        # Algunos modelos con device_map ya están distribuidos; ignorar si falla
+        
         pass
 
     return tokenizer, model, device
 
 # -------------------------
-# Resumen de configuración (útil en Colab)
+# Resumen 
 # -------------------------
 def print_config_summary():
     lines = [
@@ -460,7 +457,7 @@ def print_config_summary():
     ]
     logger.info("Config summary:\n%s", "\n".join(lines))
 
-# Mostrar un resumen corto cuando se importa en entorno interactivo (p. ej. Colab)
+
 try:
     if "google.colab" in str(os.sys.modules.get("google.colab", "")) or os.getenv("COLAB_GPU") or os.getenv("CI") is None:
         print_config_summary()
@@ -468,12 +465,11 @@ except Exception:
     pass
 
 
-# -------------------------
-# Cuando se ejecuta como script, imprime el resumen y listados
-# -------------------------
+
 if __name__ == "__main__":
     print_config_summary()
     print("Detected artifact:")
     print("  LLM_MODEL =", LLM_MODEL)
     print("  LLM_ADAPTER_PATH =", LLM_ADAPTER_PATH)
     print("  LLM_IS_ADAPTER =", LLM_IS_ADAPTER)
+
