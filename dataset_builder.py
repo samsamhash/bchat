@@ -2,10 +2,7 @@
 """
 Dataset builder for fine-tuning from raw interaction logs.
 
-This script reads raw interaction records produced by `training_logger.py`
-(or a compatible JSONL file), applies filtering, normalization and optional
-language filtering, and writes out a cleaned dataset suitable for instruction
-or chat-style fine-tuning (JSONL).
+
 
 Features:
 - Loads raw examples via training_logger.get_default_logger().load_raw_examples()
@@ -19,14 +16,7 @@ Features:
     * "chat": {"messages": [{"role":"system","content":"..."}, {"role":"user","content":"..."}, ...]}
 - Save train/validation splits and produce basic dataset stats.
 
-Usage (CLI):
-    python dataset_builder.py --out data/datasets/chat_finetune.jsonl --format chat --val_split 0.05
 
-Programmatic usage:
-    from dataset_builder import build_dataset_from_logger
-    build_dataset_from_logger(...)
-
-Author: Generated for user's RAG project
 """
 
 from __future__ import annotations
@@ -38,7 +28,7 @@ import hashlib
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-# Try to import training_logger (expected to exist in the project)
+# Try to import training_logger
 try:
     import training_logger
     from training_logger import get_default_logger
@@ -52,7 +42,7 @@ try:
 except Exception:
     lang_detect = None
 
-# Simple PII redaction regexes (similar to training_logger)
+# Simple PII redaction regexes 
 import re
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _PHONE_RE = re.compile(r"(?:(?:\+?\d{1,3}[\s\-\.])?(?:\(?\d{2,4}\)?[\s\-\.])?\d{3,4}[\s\-\.]\d{3,4})")
@@ -509,3 +499,4 @@ def _cli():
 
 if __name__ == "__main__":
     _cli()
+
