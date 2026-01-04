@@ -1,15 +1,7 @@
 # finetune.py
 """
-Robust, ready-to-run fine-tuning script (LoRA / PEFT) for causal LMs (Qwen-compatible).
-Designed to be robust against the common errors you've encountered:
- - tokenizer/model embedding size mismatch (resizes embeddings when necessary)
- - 8-bit (bitsandbytes) workflows: prepare_model_for_kbit_training BEFORE applying PEFT
- - gradient checkpointing + use_cache handling
- - dataset processing identical to your working script (prompt template when available)
- - sanity-forward with validation (truncation/resizing) before starting Trainer to avoid silent CUDA asserts
- - filters examples with no supervised signal (all -100 labels)
-Usage (example):
-    python finetune.py --data /path/to/chat_finetune.jsonl --config-out models/qwen-rag-ft --max-seq 1024
+fine-tuning script (LoRA / PEFT) for causal LMs for qwen.
+
 """
 
 from __future__ import annotations
@@ -67,7 +59,7 @@ DEFAULTS = {
 # Utilities
 # -----------------------
 def load_project_config_or_defaults() -> Dict:
-    """Return a dict of configuration values, preferring the project's finetune_config if available."""
+    """Return a dict of configuration values"""
     if not _HAS_PROJECT_CONFIG:
         return DEFAULTS.copy()
     cfg_obj = get_config()
@@ -115,7 +107,7 @@ def safe_save_config(cfg_dict: Dict, out_dir: str):
 
 def resize_model_embeddings(model, new_size: int):
     """
-    Resize model embeddings in a robust way (works whether model is wrapped by PEFT or not).
+    Resize model embedding ,works whether model is wrapped by PEFT or not.
     """
     try:
         # Some wrappers (PEFT) may forward resize_token_embeddings to base model; try directly
@@ -136,7 +128,7 @@ def resize_model_embeddings(model, new_size: int):
 
 
 # -----------------------
-# Data processing (mirrors your working script)
+# Data processing 
 # -----------------------
 def process_example_messages(messages: List[Dict], tokenizer, max_length: int):
     """
@@ -432,7 +424,7 @@ def main():
         tokenizer=tokenizer,
     )
 
-    # -----------------------
+    
     # Sanity forward: validate batch and check loss.requires_grad
     # -----------------------
     logger.info("Performing sanity forward check with a small batch...")
@@ -507,3 +499,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
