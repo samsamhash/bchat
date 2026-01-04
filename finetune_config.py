@@ -1,22 +1,9 @@
 # finetune_config.py
 """
-Configuración centralizada para el pipeline de fine-tuning (LoRA/QLoRA) — listo para usar.
+Centralize hyperparameters, paths, and training options.
+Allow overrides via environment variables or JSON/YAML files.
+Provide minimal validation and helpers for creating directories.
 
-Propósito:
-- Centralizar hiperparámetros, rutas y opciones de entrenamiento.
-- Permitir sobreescritura por variables de entorno o por fichero JSON/YAML.
-- Proveer validación mínima y helpers para crear directorios.
-
-Cómo usar:
-    from finetune_config import get_config, save_config
-    cfg = get_config()
-    print(cfg.BASE_MODEL, cfg.OUTPUT_DIR)
-    # Pasar cfg a tu script de entrenamiento finetune.py
-
-Notas:
-- Este archivo no ejecuta el entrenamiento, sólo define la configuración.
-- Diseñado para usarse con transformers + peft (LoRA / QLoRA). Ajusta los nombres
-  de los módulos objetivo (target_modules) según la arquitectura del modelo base.
 """
 
 from __future__ import annotations
@@ -28,7 +15,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 
-# -----------------------------
+
 # Helpers
 # -----------------------------
 def _env(key: str, default: Optional[str] = None) -> Optional[str]:
@@ -40,12 +27,12 @@ def _mkdirs(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
-# -----------------------------
-# Dataclasses de configuración
+
+# Dataclasses 
 # -----------------------------
 @dataclass
 class LoRAConfig:
-    # Parámetros LoRA (PEFT)
+    #  LoRA (PEFT)
     r: int = 16
     lora_alpha: int = 32
     lora_dropout: float = 0.05
@@ -54,9 +41,7 @@ class LoRAConfig:
     task_type: str = "CAUSAL_LM"  # Typically "CAUSAL_LM" for decoder-only models
 
     def as_peft_dict(self) -> Dict[str, Any]:
-        """
-        Representación útil para pasar a PEFT/Trainer wrappers.
-        """
+       
         return {
             "r": self.r,
             "lora_alpha": self.lora_alpha,
@@ -69,7 +54,7 @@ class LoRAConfig:
 
 @dataclass
 class TrainingArgs:
-    # Hyperparameters de entrenamiento
+    # Hyperparameters 
     num_train_epochs: int = 3
     per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 4
@@ -97,10 +82,10 @@ class TrainingArgs:
 
 @dataclass
 class DataConfig:
-    # Rutas a datasets y opciones
+   
     train_file: Optional[str] = "data/datasets/chat_finetune.jsonl"
     validation_file: Optional[str] = "data/datasets/chat_finetune.val.jsonl"
-    text_column: Optional[str] = None  # si usas datasets library y columnas nombradas
+    text_column: Optional[str] = None  
     max_seq_length: int = 1024
     preprocessing_num_workers: int = 4
     pad_to_max_length: bool = False
@@ -145,9 +130,7 @@ class FinetuneConfig:
     ddp: bool = False
 
     def validate(self) -> None:
-        """
-        Validaciones sencillas para detectar errores de configuración comunes.
-        """
+       
         if self.training.fp16 and self.training.bf16:
             raise ValueError("fp16 and bf16 cannot both be True.")
         if self.data.max_seq_length <= 0:
@@ -167,9 +150,7 @@ class FinetuneConfig:
         return d
 
 
-# -----------------------------
-# Convenience functions
-# -----------------------------
+
 _default_config: Optional[FinetuneConfig] = None
 
 
@@ -237,3 +218,5 @@ if __name__ == "__main__":
     save_path = os.path.join(ts_dir, "finetune_config.json")
     save_config(cfg, save_path)
     print("Saved config to", save_path)
+
+
