@@ -2,18 +2,14 @@
 """
 LLM client for local inference with optional LoRA/PEFT adapter loading.
 
-Responsibilities:
-- Load tokenizer and model (base model defined in finetune_config or env)
-- If a fine-tuned adapter exists in the configured OUTPUT_DIR, apply it (PeftModel)
+
+- Load tokenizer and model
+- If a fine-tuned adapter exists in the configured OUTPUT_DIR, apply it 
 - Expose:
     - call_llm_local(prompt: str, max_new_tokens: Optional[int]=None, temperature: Optional[float]=None) -> str
     - answer_query(query: str, top_k: int = 5) -> str   (compat API used by other modules)
     - reload_model(path: Optional[str]=None)           (reload model / switch adapter)
 - Provide a global VectorStore instance `vs` for retrieval (keeps project compatibility)
-
-Notes:
-- Designed to be robust in Colab: uses device auto-detection.
-- For large models ensure your environment has enough VRAM; use 8-bit loading or LoRA adapters.
 """
 
 from __future__ import annotations
@@ -39,7 +35,7 @@ except Exception:
     PeftModel = None  # type: ignore
     _HAS_PEFT = False
 
-# Try to import the project's config helper (contains apply_adapter_to_model which handles resizing)
+# Try to import config helper 
 try:
     import config as config_module
     _HAS_CONFIG_MODULE = True
@@ -57,7 +53,7 @@ except Exception:
         sys.path.append(CURRENT_DIR)
     from vector_store import VectorStore  # re-try
 
-# Optional prompt builder (compatibility)
+# Optional prompt builder 
 try:
     from prompts import build_prompt
 except Exception:
@@ -97,7 +93,7 @@ _vs: Optional[VectorStore] = None
 vs = None  # will be initialized later
 
 
-# ------------------------
+
 # Internal helpers
 # ------------------------
 def _resolve_model_source() -> Dict[str, Any]:
@@ -181,12 +177,12 @@ def _load_tokenizer_and_model():
     _is_finetuned = False
     _finetune_type = None
     if adapter_path and _HAS_PEFT:
-        # Prefer config.apply_adapter_to_model if available (it handles tokenizer-check, checkpoint-inspection and resizing)
+        # Prefer config.apply_adapter_to_model if available, it handles tokenizer-check, checkpoint-inspection and resizing.
         if _HAS_CONFIG_MODULE and hasattr(config_module, "apply_adapter_to_model"):
             try:
                 logger.info("[LLM] Attempting to apply adapter via config.apply_adapter_to_model from %s", adapter_path)
 
-                # If adapter contains a tokenizer, prefer to use it for tokenizer (helps vocab mismatch)
+                # If adapter contains a tokenizer, prefer to use it for tokenizer 
                 try:
                     # Try loading tokenizer from adapter path; if succeeds, replace global tokenizer
                     adapter_tok = AutoTokenizer.from_pretrained(adapter_path, trust_remote_code=True, use_fast=True)
@@ -233,9 +229,9 @@ def _load_tokenizer_and_model():
 
     # Final logging about finetuned vs base
     if _is_finetuned:
-        logger.info("[LLM] ✅ Fine-tuned adapter active (type=%s). loaded_from=%s", _finetune_type, _model_loaded_from)
+        logger.info("[LLM]  Fine-tuned adapter active (type=%s). loaded_from=%s", _finetune_type, _model_loaded_from)
     else:
-        logger.info("[LLM] ℹ️ Base model active (no adapter applied). loaded_from=%s", _model_loaded_from)
+        logger.info("[LLM]  Base model active (no adapter applied). loaded_from=%s", _model_loaded_from)
 
 
 def reload_model(adapter_or_model_path: Optional[str] = None) -> None:
@@ -286,9 +282,7 @@ def call_llm_local(prompt: str, max_new_tokens: Optional[int] = None, temperatur
     messages: list of {"role": "system"|"user"|"assistant", "content": str}
     Returns the assistant text (string).
     """
-    print("prompt")
-    print(prompt)
-    print("derrrr")
+    
     url = "http://127.0.0.1:8081/v1/chat/completions"
     payload = {
          "model": "local-model",
@@ -300,10 +294,8 @@ def call_llm_local(prompt: str, max_new_tokens: Optional[int] = None, temperatur
     }
     r = requests.post(url, json=payload, timeout=120)
     j=r.json()["choices"][0]["message"]["content"]
-    print("derrrr")
-    print("j")
-    print("derrrr")
-    # Adjust parsing depending on your server response shape
+    
+    
     return j
 
 
@@ -325,14 +317,14 @@ def answer_query(query: str, top_k: int = 5) -> str:
             vs = VectorStore()
         except Exception as e:
             logger.exception("VectorStore not available: %s", e)
-            return "⚠️ Vector store not available."
+            return " Vector store not available."
 
     contexts = vs.retrieve(query, top_k=top_k)
     # Provide debug info
     logger.info("[RAG] Retrieved %d contexts for query.", len(contexts) if contexts else 0)
 
     if not contexts:
-        return "⚠️ No relevant documents found in the vector store."
+        return " No relevant documents found in the vector store."
 
     # contexts might be list of dicts; prompts.build_prompt expects list of strings in older contract
     # We'll coerce: if contexts are dicts, join their 'text' fields.
@@ -348,13 +340,13 @@ def answer_query(query: str, top_k: int = 5) -> str:
         answer = call_llm_local(prompt)
     except Exception as e:
         logger.exception("answer_query generation error: %s", e)
-        return f"❌ Error generating answer: {e}"
+        return f" Error generating answer: {e}"
 
     return answer
 
 
-# ------------------------
-# Small helper for interactive switching of adapter/model
+
+# A helper for interactive switching of adapter/model
 # ------------------------
 def get_loaded_model_info() -> Dict[str, Any]:
     return {
@@ -368,3 +360,4 @@ def get_loaded_model_info() -> Dict[str, Any]:
     }
 
 # End of llm_client.py
+
