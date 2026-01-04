@@ -2,37 +2,17 @@
 """
 training_logger.py
 
-Lightweight, safe, production-minded logger to collect user interaction examples
-for later dataset construction / fine-tuning.
+
 
 Features:
-- Append examples to a JSONL file with atomic, thread-safe writes.
+- Append examples to a JSONL file .
 - Basic validation and sanitization (PII redaction for emails, phones, credit cards, URLs).
 - Duplicate detection via SHA256 fingerprinting (persisted).
 - Optional user-feedback field and metadata (timestamp, recorded_by).
 - Utilities to list/load/rotate/export examples.
 - Configurable storage directory and file names.
 
-Usage:
-    from training_logger import TrainingLogger, DEFAULT_DATA_DIR
 
-    logger = TrainingLogger()  # uses defaults: data/training_logs/raw_interactions.jsonl
-    example = {
-        "conversation": [
-            {"role": "user", "content": "My name is Alice and I live in Madrid."},
-            {"role": "assistant", "content": "Nice to meet you, Alice."}
-        ],
-        "question": "Where does the user live?",
-        "answer": "The user lives in Madrid.",
-        "language": "en",
-        "sources_used": True
-    }
-    logger.log_example(example, user_confirmed=True)
-
-Notes on privacy/compliance:
-- This module performs lightweight redaction but **is not** a substitute for a legal
-  privacy review. If user data is sensitive (PII, health, financial), you must
-  implement stronger anonymization and secure storage, and obtain legal consent.
 """
 
 from __future__ import annotations
@@ -86,9 +66,9 @@ def _sha256_of_json(obj: Any) -> str:
 
 def _atomic_append_line(path: str, line: str) -> None:
     """
-    Append a single line atomically (safe-ish) by writing to a temp file in the same dir
-    and then using os.rename to append heavy-IO safe? The safe approach is open+write+fsync.
-    We'll open in append mode and fsync for durability; use a lock around calls in-process.
+    Append a single line by writing to a temp file in the same dir
+    and then using os.rename to append heavy-IO, a safe approach is open+write+fsync.
+   
     """
     # Open file descriptor and append then fsync
     with open(path, "a", encoding="utf-8") as f:
@@ -449,3 +429,5 @@ def _cli_main(argv: List[str]):
 if __name__ == "__main__":
     import sys
     _cli_main(sys.argv[1:])
+
+
