@@ -7,15 +7,9 @@ Features:
  - Optional training feedback hooks via training_logger (mark for training, thumbs up/down, corrections)
  - Clear UI history, clear persistent memory
  - Memory inspector to view recent memory items
- - Avoids usage of Gradio component methods that cause AttributeError (no .update() calls)
+ 
 
-Requirements (project files present in same folder):
- - chat_with_memory.py  -> provides ChatWithMemory
- - training_logger.py   -> optional, provides log_example / get_default_logger
- - llm_client.py, memory_manager.py, vectorstore.py, prompts.py etc.
 
-Run:
-    python chat_ui.py
 """
 from __future__ import annotations
 
@@ -315,7 +309,7 @@ def build_ui() -> gr.Blocks:
         memory_output = gr.Textbox(label="Memory (recent items)", lines=10)
         feedback_output = gr.Textbox(label="Feedback status", lines=2)
 
-        # Bind events - note outputs must match return types
+        
         send_btn.click(fn=ask_fn, inputs=[chatbot, txt, top_k], outputs=[chatbot, txt])
         clear_btn.click(fn=clear_history, inputs=None, outputs=[chatbot, txt])
         # clear memory returns (history, input_reset, status_message) -> map to chatbot, txt, status_md
@@ -341,5 +335,5 @@ def build_ui() -> gr.Blocks:
 if __name__ == "__main__":
     demo = build_ui()
     demo.queue()
-    # In Colab you may want share=True to get a public link; use according to your security needs
+    
     demo.launch(server_name="0.0.0.0", server_port=7860, share=True)
